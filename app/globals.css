@@ -1,27 +1,162 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0a0a0f;
+  --cyan: #00f5ff;
+  --magenta: #ff00ff;
+  --green: #00ff85;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: #e2e8f0;
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
+/* Grid handled by GridBackground canvas component */
+.crt::before {
+  content: none;
+}
+
+/* Moving rainbow wash over the grid */
+.crt::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    rgba(0,245,255,0.04) 0%,
+    rgba(168,85,247,0.04) 20%,
+    rgba(255,0,255,0.04) 35%,
+    rgba(0,255,133,0.04) 55%,
+    rgba(245,158,11,0.04) 75%,
+    rgba(0,245,255,0.04) 100%
+  );
+  background-size: 300% 300%;
+  animation: rainbowDrift 12s linear infinite;
+  pointer-events: none;
+  z-index: 9998;
+}
+
+@keyframes rainbowDrift {
+  0%   { background-position: 0% 0%; }
+  100% { background-position: 200% 100%; }
+}
+
+/* Neon glow text */
+.neon-cyan {
+  color: var(--cyan);
+  text-shadow: 0 0 8px var(--cyan), 0 0 24px var(--cyan), 0 0 48px var(--cyan);
+}
+.neon-magenta {
+  color: var(--magenta);
+  text-shadow: 0 0 8px var(--magenta), 0 0 24px var(--magenta), 0 0 48px var(--magenta);
+}
+.neon-green {
+  color: var(--green);
+  text-shadow: 0 0 8px var(--green), 0 0 24px var(--green);
+}
+
+/* Legendary shimmer text */
+.legendary-shimmer {
+  background: linear-gradient(90deg, #f59e0b 0%, #fef08a 30%, #f59e0b 50%, #d97706 75%, #f59e0b 100%);
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 2s linear infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Card 3D flip */
+.perspective { perspective: 1000px; }
+
+.card-inner {
+  transform-style: preserve-3d;
+  transition: transform 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.card-inner.flipped { transform: rotateY(180deg); }
+
+.card-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  position: absolute;
+  inset: 0;
+}
+
+.card-back-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: rotateY(180deg);
+  position: absolute;
+  inset: 0;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #111; }
+::-webkit-scrollbar-thumb { background: var(--cyan); border-radius: 3px; }
+
+/* Pixel border utility */
+.pixel-border {
+  border: 2px solid;
+  image-rendering: pixelated;
+}
+
+/* Mythic aura pulse */
+@keyframes mythicPulse {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50%       { opacity: 1;   transform: scale(1.04); }
+}
+@keyframes mythicRing {
+  0%   { transform: scale(0.9); opacity: 0.9; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@keyframes sparkleFloat {
+  0%   { transform: translate(0, 0)    scale(1);   opacity: 1; }
+  100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+}
+@keyframes mythicFlash {
+  0%   { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+
+/* Card sheen sweep */
+@keyframes sheenSweep {
+  0%   { transform: translateX(-150%) skewX(-20deg); opacity: 1; }
+  100% { transform: translateX(250%)  skewX(-20deg); opacity: 1; }
+}
+
+.card-sheen {
+  animation: sheenSweep 0.9s ease-in-out forwards;
+  animation-delay: 0.4s;
+  opacity: 0;
+}
+
+/* God Pack overlay */
+@keyframes godGlow {
+  0%, 100% { text-shadow: 0 0 20px #f59e0b, 0 0 40px #f59e0b80; }
+  50%       { text-shadow: 0 0 40px #fff, 0 0 80px #f59e0b, 0 0 120px #f59e0b60; }
+}
+@keyframes godRingExpand {
+  0%   { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(2.8); opacity: 0; }
+}
+.god-pack-text {
+  animation: godGlow 1s ease-in-out infinite;
 }
