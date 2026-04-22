@@ -207,7 +207,7 @@ export default function Landing() {
               {[
                 { img: '/card-03-robotson-pool.png',   name: 'Mr. Robotson (Pool)', rarity: 'COMMON',   color: '#00f5ff', label: 'Most frequent. 15 unique cards.',   tilt: -6  },
                 { img: '/card-mythic-showcase.png',    name: 'Golden Mr. Robotson', rarity: 'MYTHIC',   color: '#f59e0b', label: 'Ultra rare. 1 mythic card.',        tilt: 0   },
-                { img: '/card-17-gintare.png',          name: 'Gintare',            rarity: 'RARE',     color: '#ff00ff', label: 'Rare pull. 4 team member cards.',   tilt: 6   },
+                { img: '/card-16-ilan.png',             name: 'Ilan',               rarity: 'RARE',     color: '#ff00ff', label: 'Rare pull. 4 team member cards.',   tilt: 6   },
               ].map(({ img, name, rarity, color, label, tilt }, i) => (
                 <motion.div
                   key={name}
