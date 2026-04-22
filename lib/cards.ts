@@ -88,6 +88,10 @@ function buildGodPack(): Card[] {
   return [shuffled[0], shuffled[1], MYTHICS[0], shuffled[2], shuffled[3]]
 }
 
+// TEMPORARY: session pack counter for demo purposes
+// Pack 1 → Jay guaranteed; Packs 2-3 → Jay excluded; Pack 4+ → normal
+let sessionPackCount = 0
+
 // Rules:
 //   • 3% chance of God Pack (5 cards: 4 rares + mythic)
 //   • Otherwise 3 cards per pack
@@ -95,10 +99,33 @@ function buildGodPack(): Card[] {
 //   • Rarity odds per slot: Mythic 5%, Rare 18%, Common 77%
 //   • Result shuffled so rare position isn't predictable
 export function getRandomPack(): PackResult {
-  // 3% chance: God Pack
-  if (Math.random() < 0.03) {
+  const packIndex = sessionPackCount++
+
+  // TEMPORARY: first pack always contains Jay
+  if (packIndex === 0) {
+    const jay = RARES.find(c => c.name === 'Jay')!
+    const usedIds = new Set<number>([jay.id])
+    const pick = (pool: Card[]) => {
+      const available = pool.filter(c => !usedIds.has(c.id))
+      if (!available.length) return null
+      const card = available[Math.floor(Math.random() * available.length)]
+      usedIds.add(card.id)
+      return card
+    }
+    const filler1 = pick(CHARACTER_COMMONS)!
+    const filler2 = pick(PRODUCT_COMMONS) ?? pick(CHARACTER_COMMONS)!
+    return { cards: [filler1, filler2, jay], isGodPack: false }
+  }
+
+  // 3% chance: God Pack (packs 4+; skip for packs 2-3 to keep Jay excluded clean)
+  if (packIndex > 2 && Math.random() < 0.03) {
     return { cards: buildGodPack(), isGodPack: true }
   }
+
+  // TEMPORARY: packs 2-3 exclude Jay
+  const rarePool = packIndex <= 2
+    ? RARES.filter(c => c.name !== 'Jay')
+    : RARES
 
   const usedIds = new Set<number>()
 
@@ -123,14 +150,13 @@ export function getRandomPack(): PackResult {
       card = pick(MYTHICS)
       if (card) hasMythic = true
     } else if (!hasRare && roll < 0.23) {
-      card = pick(RARES)
+      card = pick(rarePool)
       if (card) hasRare = true
     } else if (!hasProduct && roll < 0.55) {
       card = pick(PRODUCT_COMMONS)
       if (card) hasProduct = true
     }
 
-    // Fallback to character common if nothing was picked
     if (!card) card = pick(CHARACTER_COMMONS)
     if (card) pack.push(card)
   }
@@ -138,11 +164,9 @@ export function getRandomPack(): PackResult {
   const hasBothRareAndMythic = pack.some(c => c.rarity === 'Rare') && pack.some(c => c.rarity === 'Mythic')
 
   if (hasBothRareAndMythic) {
-    // Rare left (0), Common center (1), Mythic right (2)
     const rank = (c: Card) => c.rarity === 'Rare' ? 0 : c.rarity === 'Mythic' ? 2 : 1
     pack.sort((a, b) => rank(a) - rank(b))
   } else {
-    // Default: rarest on right
     const rank = (c: Card) => c.rarity === 'Mythic' ? 2 : c.rarity === 'Rare' ? 2 : 0
     pack.sort((a, b) => rank(a) - rank(b))
   }
