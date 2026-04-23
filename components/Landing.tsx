@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import PackModal from './PackModal'
+import { ALL_CARDS } from '@/lib/cards'
 
 // Mock: track if today's pack was claimed (per-session only)
 let sessionClaimed = false
@@ -13,6 +14,16 @@ export default function Landing() {
   const [packOpen, setPackOpen] = useState(false)
   const [clickedPack, setClickedPack] = useState<number>(1)
   const [packOrigin, setPackOrigin] = useState<PackOrigin | null>(null)
+
+  // Preload all card images so there's no lag on reveal
+  useEffect(() => {
+    ALL_CARDS.forEach(card => {
+      if (card.image) {
+        const img = new Image()
+        img.src = card.image
+      }
+    })
+  }, [])
   const [lightbox, setLightbox] = useState<{ img: string; name: string; rarity: string; color: string; label: string } | null>(null)
 
   const openPack = () => {
