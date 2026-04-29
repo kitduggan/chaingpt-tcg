@@ -1,14 +1,17 @@
-import { createPublicClient, http } from 'viem'
+import { createPublicClient, http, fallback } from 'viem'
 import { bsc } from 'viem/chains'
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract'
 import { ALL_CARDS } from '@/lib/cards'
 
-// Ankr's public BSC RPC — more reliable from server environments than the default
-const BSC_RPC = 'https://rpc.ankr.com/bsc'
-
+// Public BSC RPC endpoints — Ankr now requires an API key so we use Binance nodes + fallbacks
 const client = createPublicClient({
   chain: bsc,
-  transport: http(BSC_RPC, { timeout: 8_000 }),
+  transport: fallback([
+    http('https://bsc-dataseed.binance.org/',  { timeout: 8_000 }),
+    http('https://bsc-dataseed1.binance.org/', { timeout: 8_000 }),
+    http('https://bsc-dataseed2.binance.org/', { timeout: 8_000 }),
+    http('https://bsc.publicnode.com',         { timeout: 8_000 }),
+  ]),
 })
 
 const BASE_URL = 'https://chaingpt-tcg.vercel.app'
