@@ -27,6 +27,13 @@ export const CONTRACT_ABI = [
     outputs: [{ name: '', type: 'uint8[]' }],
   },
   {
+    name: 'cardTypeOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'tokenId', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint8' }],
+  },
+  {
     name: 'CardMinted',
     type: 'event',
     inputs: [
