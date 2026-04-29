@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import dynamic from 'next/dynamic'
+import Providers from './providers'
+
 const GridBackground = dynamic(() => import('@/components/GridBackground'), { ssr: false })
 
 export const metadata: Metadata = {
@@ -13,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="crt bg-[#0a0a0f] min-h-screen antialiased">
         <GridBackground />
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )

@@ -3,12 +3,8 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ALL_CARDS, RARITY_COLORS, type Card } from '@/lib/cards'
-
-// Mock owned: 5 commons + 2 rares
-const OWNED_IDS = new Set([1, 2, 3, 4, 5, 8, 12, 16, 17])
-
-const OWNED   = ALL_CARDS.filter(c => OWNED_IDS.has(c.id))
-const UNOWNED = ALL_CARDS.filter(c => !OWNED_IDS.has(c.id) && c.rarity !== 'Mythic')
+import { useAccount, useReadContract } from 'wagmi'
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract'
 
 function CollectionCard({ card, onClick }: { card: Card; onClick: () => void }) {
   const color = card.color ?? RARITY_COLORS[card.rarity]
@@ -30,7 +26,10 @@ function CollectionCard({ card, onClick }: { card: Card; onClick: () => void }) 
         <img src={card.image} alt={card.name} className="w-full h-full object-cover" draggable={false} />
       </div>
       <div className="flex flex-col items-center gap-1">
-        <span className="font-pixel text-[8px] text-center leading-tight" style={{ color, textShadow: `0 0 8px ${color}` }}>
+        <span
+          className="font-pixel text-[8px] text-center leading-tight"
+          style={{ color, textShadow: `0 0 8px ${color}` }}
+        >
           {card.rarity.toUpperCase()}
         </span>
         <span className="font-ui text-xs text-gray-300 text-center leading-tight">{card.name}</span>
@@ -44,11 +43,7 @@ function LockedCard() {
     <div className="flex flex-col items-center gap-3">
       <div
         className="w-full rounded-2xl overflow-hidden flex items-center justify-center"
-        style={{
-          aspectRatio: '2/3',
-          background: '#0d0d18',
-          border: '2px solid #ffffff08',
-        }}
+        style={{ aspectRatio: '2/3', background: '#0d0d18', border: '2px solid #ffffff08' }}
       >
         <span className="font-pixel text-2xl text-gray-700">?</span>
       </div>
@@ -59,8 +54,22 @@ function LockedCard() {
 
 export default function Collection() {
   const [lightbox, setLightbox] = useState<Card | null>(null)
-  const ownedCount = OWNED.length
-  const total = ALL_CARDS.filter(c => c.rarity !== 'Mythic').length + 1 // include mythic
+  const { address, isConnected } = useAccount()
+
+  const { data: rawCardTypes, isLoading } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'getOwnedCardTypes',
+    args: [address!],
+    query: { enabled: !!address },
+  })
+
+  // Deduplicate: owning 3 copies of card #5 counts as 1 collected
+  const ownedIds = new Set(rawCardTypes ? Array.from(rawCardTypes as readonly number[]) : [])
+
+  const owned   = ALL_CARDS.filter(c =>  ownedIds.has(c.id))
+  const unowned = ALL_CARDS.filter(c => !ownedIds.has(c.id))
+  const ownedCount = owned.length
 
   return (
     <div className="min-h-screen pt-14 pb-20">
@@ -94,43 +103,73 @@ export default function Collection() {
 
       <div className="max-w-5xl mx-auto px-6 flex flex-col gap-16">
 
-        {/* Owned cards */}
-        <section className="flex flex-col gap-6">
-          <div className="flex items-center gap-4">
-            <h2 className="font-pixel text-[10px] text-white tracking-widest">COLLECTED</h2>
-            <div className="flex-1 h-px bg-white/10" />
-            <span className="font-pixel text-[7px] text-[#00ff85]">{ownedCount} CARDS</span>
+        {/* Not connected */}
+        {!isConnected && (
+          <div className="flex flex-col items-center gap-4 py-24">
+            <p className="font-pixel text-[9px] text-gray-500">CONNECT YOUR WALLET</p>
+            <p className="font-ui text-sm text-gray-600">to see your on-chain card collection</p>
           </div>
+        )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {OWNED.map((card, i) => (
-              <motion.div
-                key={card.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.06 }}
-              >
-                <CollectionCard card={card} onClick={() => setLightbox(card)} />
-              </motion.div>
-            ))}
+        {/* Loading */}
+        {isConnected && isLoading && (
+          <div className="flex items-center justify-center py-24">
+            <p
+              className="font-pixel text-[9px] text-[#00f5ff]"
+              style={{ animation: 'pulse 1.4s ease-in-out infinite' }}
+            >
+              LOADING COLLECTION...
+            </p>
           </div>
-        </section>
+        )}
 
-        {/* Locked cards */}
-        <section className="flex flex-col gap-6">
-          <div className="flex items-center gap-4">
-            <h2 className="font-pixel text-[10px] text-gray-600 tracking-widest">NOT YET COLLECTED</h2>
-            <div className="flex-1 h-px bg-white/5" />
-            <span className="font-pixel text-[7px] text-gray-600">{UNOWNED.length + 1} CARDS</span>
-          </div>
+        {/* Cards */}
+        {isConnected && !isLoading && (
+          <>
+            {/* Owned */}
+            <section className="flex flex-col gap-6">
+              <div className="flex items-center gap-4">
+                <h2 className="font-pixel text-[10px] text-white tracking-widest">COLLECTED</h2>
+                <div className="flex-1 h-px bg-white/10" />
+                <span className="font-pixel text-[7px] text-[#00ff85]">{ownedCount} CARDS</span>
+              </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 opacity-40">
-            {[...UNOWNED, ALL_CARDS.find(c => c.rarity === 'Mythic')!].map(card => (
-              <LockedCard key={card.id} />
-            ))}
-          </div>
-        </section>
+              {owned.length === 0 ? (
+                <p className="font-ui text-sm text-gray-600 text-center py-10">
+                  No cards yet — open a pack!
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                  {owned.map((card, i) => (
+                    <motion.div
+                      key={card.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.06 }}
+                    >
+                      <CollectionCard card={card} onClick={() => setLightbox(card)} />
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </section>
 
+            {/* Locked */}
+            <section className="flex flex-col gap-6">
+              <div className="flex items-center gap-4">
+                <h2 className="font-pixel text-[10px] text-gray-600 tracking-widest">NOT YET COLLECTED</h2>
+                <div className="flex-1 h-px bg-white/5" />
+                <span className="font-pixel text-[7px] text-gray-600">{unowned.length} CARDS</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 opacity-40">
+                {unowned.map(card => (
+                  <LockedCard key={card.id} />
+                ))}
+              </div>
+            </section>
+          </>
+        )}
       </div>
 
       {/* Lightbox */}
@@ -163,8 +202,10 @@ export default function Collection() {
               >
                 <img src={lightbox.image} alt={lightbox.name} className="w-full h-full object-cover" />
               </div>
-              <p className="font-pixel text-[9px] text-center mt-4"
-                style={{ color: lightbox.color ?? RARITY_COLORS[lightbox.rarity] }}>
+              <p
+                className="font-pixel text-[9px] text-center mt-4"
+                style={{ color: lightbox.color ?? RARITY_COLORS[lightbox.rarity] }}
+              >
                 {lightbox.name}
               </p>
               <p className="font-ui text-xs text-gray-500 text-center mt-1">{lightbox.description}</p>
