@@ -1,6 +1,6 @@
 import { bsc } from 'wagmi/chains'
 
-export const CONTRACT_ADDRESS = '0xF6543F78DdaC7847C8d98AD9c6Eb1CBbD55002d6' as `0x${string}`
+export const CONTRACT_ADDRESS = '0x035C26Fcb343DFFf324c0C08b403BC2D987EeD88' as `0x${string}`
 
 export const CONTRACT_CHAIN = bsc
 
