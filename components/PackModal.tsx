@@ -331,7 +331,7 @@ export default function PackModal({ open, packIndex, packOrigin, onClose }: Pack
       return
     }
 
-    // ── Blockchain mint path ─────────────────────────────────────────────────
+    // ── Blockchain open path ─────────────────────────────────────────────────
     setStage('ripping') // start rip animation immediately
     setMinting(true)
 
@@ -339,7 +339,7 @@ export default function PackModal({ open, packIndex, packOrigin, onClose }: Pack
       const hash = await writeContractAsync({
         address: CONTRACT_ADDRESS,
         abi: CONTRACT_ABI,
-        functionName: 'mintPack',
+        functionName: 'openPack',
       })
 
       if (!publicClient) throw new Error('No network client')
@@ -347,26 +347,25 @@ export default function PackModal({ open, packIndex, packOrigin, onClose }: Pack
 
       const logs = parseEventLogs({
         abi: CONTRACT_ABI,
-        eventName: 'PackMinted',
+        eventName: 'PackOpened',
         logs: receipt.logs,
       })
 
       const cardTypeIds = logs[0]?.args?.cardTypes
       if (!cardTypeIds || cardTypeIds.length === 0) throw new Error('No cards in receipt')
 
-      const mintedCards = Array.from(cardTypeIds)
+      const openedCards = Array.from(cardTypeIds)
         .map(id => ALL_CARDS.find(c => c.id === id))
         .filter((c): c is Card => !!c)
 
-      setCards(mintedCards)
+      setCards(openedCards)
       setIsGodPack(false)
       setMinting(false)
       setStage('revealed')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      // Ignore user-rejected / cancelled transactions
       if (!msg.toLowerCase().includes('rejected') && !msg.toLowerCase().includes('denied') && !msg.toLowerCase().includes('cancelled')) {
-        setMintError('Mint failed. Make sure you have BNB for gas.')
+        setMintError('Failed. Make sure you have BNB for gas.')
       }
       setMinting(false)
       setStage('idle')
@@ -575,7 +574,7 @@ export default function PackModal({ open, packIndex, packOrigin, onClose }: Pack
                     className="font-pixel text-[8px] text-[#00f5ff]"
                     style={{ textShadow: '0 0 10px #00f5ff', animation: 'pulse 1.4s ease-in-out infinite' }}
                   >
-                    MINTING ON CHAIN...
+                    OPENING ON CHAIN...
                   </p>
                   <p className="font-ui text-xs text-gray-500">Confirm in your wallet</p>
                 </motion.div>
