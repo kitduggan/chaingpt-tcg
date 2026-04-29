@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { getRandomPack, RARITY_COLORS, ALL_CARDS, type Card } from '@/lib/cards'
-import { useAccount, useWriteContract, usePublicClient } from 'wagmi'
-import { parseEventLogs } from 'viem'
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract'
+import { getRandomPack, RARITY_COLORS, type Card } from '@/lib/cards'
+import { useAccount } from 'wagmi'
+import { addEarnedCards } from '@/lib/storage'
 
 type Stage = 'idle' | 'ripping' | 'god-reveal' | 'revealed'
 
@@ -282,12 +281,8 @@ export default function PackModal({ open, packIndex, packOrigin, onClose }: Pack
   const [isGodPack, setIsGodPack] = useState(false)
   const [lightbox, setLightbox]   = useState<Card | null>(null)
   const [arrived, setArrived]     = useState(false)
-  const [minting, setMinting]     = useState(false)
-  const [mintError, setMintError] = useState<string | null>(null)
 
-  const { isConnected } = useAccount()
-  const { writeContractAsync } = useWriteContract()
-  const publicClient = usePublicClient()
+  const { address } = useAccount()
 
   useEffect(() => {
     if (!open) {
@@ -296,8 +291,6 @@ export default function PackModal({ open, packIndex, packOrigin, onClose }: Pack
       setIsGodPack(false)
       setLightbox(null)
       setArrived(false)
-      setMinting(false)
-      setMintError(null)
     }
   }, [open])
 
@@ -312,63 +305,24 @@ export default function PackModal({ open, packIndex, packOrigin, onClose }: Pack
     return () => window.removeEventListener('keydown', handler)
   }, [handleClose])
 
-  const handlePackClick = async () => {
-    if (stage !== 'idle' || minting) return
-    setMintError(null)
+  const handlePackClick = () => {
+    if (stage !== 'idle') return
 
-    // ── Demo mode (no wallet connected) ─────────────────────────────────────
-    if (!isConnected) {
-      const result = getRandomPack()
-      setCards(result.cards)
-      setIsGodPack(result.isGodPack)
-      setStage('ripping')
-      if (result.isGodPack) {
-        setTimeout(() => setStage('god-reveal'), 480)
-        setTimeout(() => setStage('revealed'), 2800)
-      } else {
-        setTimeout(() => setStage('revealed'), 600)
-      }
-      return
+    const result = getRandomPack()
+    setCards(result.cards)
+    setIsGodPack(result.isGodPack)
+    setStage('ripping')
+
+    // Save cards to localStorage — no wallet popup, completely free
+    if (address) {
+      addEarnedCards(address, result.cards.map(c => c.id))
     }
 
-    // ── Blockchain open path ─────────────────────────────────────────────────
-    setStage('ripping') // start rip animation immediately
-    setMinting(true)
-
-    try {
-      const hash = await writeContractAsync({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
-        functionName: 'openPack',
-      })
-
-      if (!publicClient) throw new Error('No network client')
-      const receipt = await publicClient.waitForTransactionReceipt({ hash })
-
-      const logs = parseEventLogs({
-        abi: CONTRACT_ABI,
-        eventName: 'PackOpened',
-        logs: receipt.logs,
-      })
-
-      const cardTypeIds = logs[0]?.args?.cardTypes
-      if (!cardTypeIds || cardTypeIds.length === 0) throw new Error('No cards in receipt')
-
-      const openedCards = Array.from(cardTypeIds)
-        .map(id => ALL_CARDS.find(c => c.id === id))
-        .filter((c): c is Card => !!c)
-
-      setCards(openedCards)
-      setIsGodPack(false)
-      setMinting(false)
-      setStage('revealed')
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      if (!msg.toLowerCase().includes('rejected') && !msg.toLowerCase().includes('denied') && !msg.toLowerCase().includes('cancelled')) {
-        setMintError('Failed. Make sure you have BNB for gas.')
-      }
-      setMinting(false)
-      setStage('idle')
+    if (result.isGodPack) {
+      setTimeout(() => setStage('god-reveal'), 480)
+      setTimeout(() => setStage('revealed'), 2800)
+    } else {
+      setTimeout(() => setStage('revealed'), 600)
     }
   }
 
@@ -561,52 +515,23 @@ export default function PackModal({ open, packIndex, packOrigin, onClose }: Pack
               </motion.div>
             </motion.div>
 
-            {/* Minting indicator */}
-            <AnimatePresence>
-              {minting && (
-                <motion.div
-                  className="fixed bottom-10 left-0 right-0 flex flex-col items-center gap-2 pointer-events-none"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <p
-                    className="font-pixel text-[8px] text-[#00f5ff]"
-                    style={{ textShadow: '0 0 10px #00f5ff', animation: 'pulse 1.4s ease-in-out infinite' }}
-                  >
-                    OPENING ON CHAIN...
-                  </p>
-                  <p className="font-ui text-xs text-gray-500">Confirm in your wallet</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Mint error */}
-            <AnimatePresence>
-              {mintError && (
-                <motion.div
-                  className="fixed bottom-10 left-0 right-0 text-center pointer-events-none"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <p className="font-pixel text-[8px] text-red-400">{mintError}</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Close hint */}
+            {/* Close hint / connect nudge */}
             <AnimatePresence>
               {stage === 'revealed' && (
-                <motion.p
-                  className="fixed bottom-10 left-0 right-0 text-center font-ui text-xs text-gray-500 pointer-events-none"
+                <motion.div
+                  className="fixed bottom-10 left-0 right-0 flex flex-col items-center gap-1 pointer-events-none"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ delay: 0.5 }}
                 >
-                  Click anywhere to close · ESC
-                </motion.p>
+                  {!address && (
+                    <p className="font-pixel text-[7px] text-[#00f5ff]/70">
+                      Connect wallet to save your cards
+                    </p>
+                  )}
+                  <p className="font-ui text-xs text-gray-500">Click anywhere to close · ESC</p>
+                </motion.div>
               )}
             </AnimatePresence>
           </div>

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ALL_CARDS, RARITY_COLORS, type Card } from '@/lib/cards'
 import { useAccount, useReadContract, useWriteContract, usePublicClient } from 'wagmi'
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '@/lib/contract'
+import { getEarnedCards, removeEarnedCard, removeEarnedCards } from '@/lib/storage'
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -12,7 +13,7 @@ function CardTile({ card, badge, onClick }: { card: Card; badge?: React.ReactNod
   const color = card.color ?? RARITY_COLORS[card.rarity]
   return (
     <motion.div
-      className="cursor-pointer flex flex-col items-center gap-3 relative"
+      className="cursor-pointer flex flex-col items-center gap-3"
       whileHover={{ y: -8, scale: 1.03 }}
       transition={{ duration: 0.1, ease: 'easeOut' }}
       onClick={onClick}
@@ -54,28 +55,25 @@ function LockedCard() {
   )
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function Collection() {
-  const [lightbox, setLightbox] = useState<Card | null>(null)
+  const [lightbox, setLightbox]   = useState<Card | null>(null)
   const [mintingId, setMintingId] = useState<number | null>(null)
   const [mintingAll, setMintingAll] = useState(false)
+  const [earnedIds, setEarnedIds]   = useState<number[]>([])
 
   const { address, isConnected } = useAccount()
   const publicClient = usePublicClient()
   const { writeContractAsync } = useWriteContract()
 
-  // Cards earned from packs — stored on-chain, not yet minted as NFTs
-  const { data: rawEarned, isLoading: loadingEarned, refetch: refetchEarned } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'getEarnedCards',
-    args: [address!],
-    query: { enabled: !!address },
-  })
+  // Load earned cards from localStorage whenever address changes
+  useEffect(() => {
+    setEarnedIds(address ? getEarnedCards(address) : [])
+  }, [address])
 
-  // Cards already minted as NFTs
-  const { data: rawMinted, isLoading: loadingMinted, refetch: refetchMinted } = useReadContract({
+  // Minted NFTs — read live from contract
+  const { data: rawMinted, isLoading, refetch: refetchMinted } = useReadContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'getOwnedCardTypes',
@@ -83,37 +81,25 @@ export default function Collection() {
     query: { enabled: !!address },
   })
 
-  const isLoading = loadingEarned || loadingMinted
-
-  // Earned: keep as array (duplicates allowed — can have 2 copies of same card)
-  const earnedIds: number[] = rawEarned ? Array.from(rawEarned as readonly number[]) : []
-
-  // Minted: unique card types (set)
   const mintedIds = new Set(rawMinted ? Array.from(rawMinted as readonly number[]) : [])
 
-  // All unique card IDs the user has in any form
-  const allOwnedIds = new Set([...earnedIds, ...Array.from(mintedIds)])
-
-  // Unique earned cards for display (deduplicated, but track count)
+  // Count of each earned card type
   const earnedCounts = earnedIds.reduce<Record<number, number>>((acc, id) => {
     acc[id] = (acc[id] ?? 0) + 1
     return acc
   }, {})
+
   const uniqueEarnedCards = ALL_CARDS.filter(c => earnedCounts[c.id])
-
-  // Minted NFT cards
-  const mintedCards = ALL_CARDS.filter(c => mintedIds.has(c.id))
-
-  // Cards not owned at all
-  const notOwned = ALL_CARDS.filter(c => !allOwnedIds.has(c.id))
-
-  const totalOwned = allOwnedIds.size
+  const mintedCards       = ALL_CARDS.filter(c => mintedIds.has(c.id))
+  const allOwnedIds       = new Set([...earnedIds, ...Array.from(mintedIds)])
+  const notOwned          = ALL_CARDS.filter(c => !allOwnedIds.has(c.id))
+  const totalOwned        = allOwnedIds.size
 
   // ── Mint handlers ──────────────────────────────────────────────────────────
 
   const handleMintOne = async (cardTypeId: number, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (mintingId !== null || mintingAll) return
+    if (!address || mintingId !== null || mintingAll) return
     setMintingId(cardTypeId)
     try {
       const hash = await writeContractAsync({
@@ -122,9 +108,9 @@ export default function Collection() {
         functionName: 'mintCard',
         args: [cardTypeId],
       })
-      if (!publicClient) throw new Error('No client')
-      await publicClient.waitForTransactionReceipt({ hash })
-      refetchEarned()
+      await publicClient?.waitForTransactionReceipt({ hash })
+      removeEarnedCard(address, cardTypeId)
+      setEarnedIds(getEarnedCards(address))
       refetchMinted()
     } catch (err) {
       console.error('Mint failed:', err)
@@ -134,7 +120,7 @@ export default function Collection() {
   }
 
   const handleMintAll = async () => {
-    if (mintingId !== null || mintingAll || earnedIds.length === 0) return
+    if (!address || mintingId !== null || mintingAll || earnedIds.length === 0) return
     setMintingAll(true)
     try {
       const hash = await writeContractAsync({
@@ -143,9 +129,9 @@ export default function Collection() {
         functionName: 'mintCards',
         args: [earnedIds as unknown as number[]],
       })
-      if (!publicClient) throw new Error('No client')
-      await publicClient.waitForTransactionReceipt({ hash })
-      refetchEarned()
+      await publicClient?.waitForTransactionReceipt({ hash })
+      removeEarnedCards(address, earnedIds)
+      setEarnedIds([])
       refetchMinted()
     } catch (err) {
       console.error('Mint all failed:', err)
@@ -207,7 +193,7 @@ export default function Collection() {
 
         {isConnected && !isLoading && (
           <>
-            {/* ── EARNED (pending mint) ── */}
+            {/* ── EARNED (ready to mint) ── */}
             {uniqueEarnedCards.length > 0 && (
               <section className="flex flex-col gap-6">
                 <div className="flex items-center gap-4">
@@ -217,10 +203,9 @@ export default function Collection() {
                 </div>
 
                 <p className="font-ui text-xs text-gray-500 -mt-2">
-                  These cards are saved on-chain. Mint them as NFTs whenever you&apos;re ready.
+                  Cards from your opened packs. Mint them as NFTs whenever you&apos;re ready.
                 </p>
 
-                {/* Mint All button */}
                 <button
                   onClick={handleMintAll}
                   disabled={mintingAll || mintingId !== null}
@@ -233,8 +218,8 @@ export default function Collection() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                   {uniqueEarnedCards.map((card, i) => {
                     const count = earnedCounts[card.id] ?? 0
-                    const isMinting = mintingId === card.id
                     const color = card.color ?? RARITY_COLORS[card.rarity]
+                    const isMinting = mintingId === card.id
                     return (
                       <motion.div
                         key={card.id}
@@ -279,7 +264,6 @@ export default function Collection() {
                   <div className="flex-1 h-px bg-white/10" />
                   <span className="font-pixel text-[7px] text-[#00ff85]">{mintedCards.length} CARDS</span>
                 </div>
-
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                   {mintedCards.map((card, i) => (
                     <motion.div
