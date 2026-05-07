@@ -32,7 +32,7 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           <Link
             href="/collection"
-            className="font-ui text-xs bg-[#00f5ff] text-black font-semibold px-4 py-2 rounded hover:bg-[#00f5ff]/80 transition-colors"
+            className="font-ui text-xs bg-[#00f5ff] text-black font-semibold px-3 py-1.5 rounded whitespace-nowrap hover:bg-[#00f5ff]/80 transition-colors"
           >
             View Cards
           </Link>
