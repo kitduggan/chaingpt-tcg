@@ -1,10 +1,21 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getRandomPack, RARITY_COLORS, type Card } from '@/lib/cards'
 import { useAccount } from 'wagmi'
 import { addEarnedCards } from '@/lib/storage'
+
+function useWindowWidth() {
+  const [width, setWidth] = useState(768)
+  useEffect(() => {
+    setWidth(window.innerWidth)
+    const handler = () => setWidth(window.innerWidth)
+    window.addEventListener('resize', handler)
+    return () => window.removeEventListener('resize', handler)
+  }, [])
+  return width
+}
 
 type Stage = 'idle' | 'ripping' | 'god-reveal' | 'revealed'
 
@@ -223,6 +234,16 @@ function HoloCard({ card, color, onExpand }: { card: Card; color: string; onExpa
     setHeld(false)
   }
 
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (!ref.current || !e.touches[0]) return
+    const touch = e.touches[0]
+    const r = ref.current.getBoundingClientRect()
+    const dx = (touch.clientX - r.left) / r.width
+    const dy = (touch.clientY - r.top)  / r.height
+    setTilt({ x: (dy - 0.5) * -22, y: (dx - 0.5) * 22 })
+    setGloss({ x: dx * 100, y: dy * 100 })
+  }
+
   return (
     <div
       ref={ref}
@@ -231,6 +252,8 @@ function HoloCard({ card, color, onExpand }: { card: Card; color: string; onExpa
       onMouseLeave={onLeave}
       onMouseDown={() => setHeld(true)}
       onMouseUp={() => setHeld(false)}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onLeave}
       onClick={(e) => { e.stopPropagation(); onExpand() }}
     >
       <div
@@ -283,6 +306,8 @@ export default function PackModal({ open, packIndex, packOrigin, onClose }: Pack
   const [arrived, setArrived]     = useState(false)
 
   const { address } = useAccount()
+  const windowWidth = useWindowWidth()
+  const isMobile = windowWidth < 640
 
   useEffect(() => {
     if (!open) {
@@ -326,9 +351,36 @@ export default function PackModal({ open, packIndex, packOrigin, onClose }: Pack
     }
   }
 
-  const positions = isGodPack ? GOD_CARD_POSITIONS : CARD_POSITIONS
-  // Cards are slightly smaller in god pack so all 5 fit
-  const cardWidth = isGodPack ? 'min(26vw, 158px)' : 'min(36vw, 220px)'
+  // Responsive fan positions — fixed px values go off-screen on phones
+  const positions = useMemo(() => {
+    if (isGodPack) {
+      if (isMobile) {
+        const gap = Math.round(windowWidth * 0.185)
+        return [
+          { x: -gap * 2, y: -12, rotate: -20 },
+          { x: -gap,     y: -24, rotate: -10 },
+          { x: 0,        y: -32, rotate: 0   },
+          { x: gap,      y: -24, rotate: 10  },
+          { x: gap * 2,  y: -12, rotate: 20  },
+        ]
+      }
+      return GOD_CARD_POSITIONS
+    }
+    if (isMobile) {
+      const gap = Math.round(windowWidth * 0.26)
+      return [
+        { x: -gap, y: -20, rotate: -15 },
+        { x: 0,    y: -35, rotate: 0   },
+        { x: gap,  y: -20, rotate: 15  },
+      ]
+    }
+    return CARD_POSITIONS
+  }, [isGodPack, isMobile, windowWidth])
+
+  // Cards are slightly smaller in god pack so all 5 fit; even smaller on mobile
+  const cardWidth = isGodPack
+    ? `min(${isMobile ? '20' : '26'}vw, 158px)`
+    : `min(${isMobile ? '28' : '36'}vw, 220px)`
 
   return (
     <AnimatePresence>
@@ -530,7 +582,7 @@ export default function PackModal({ open, packIndex, packOrigin, onClose }: Pack
                       Connect wallet to save your cards
                     </p>
                   )}
-                  <p className="font-ui text-xs text-gray-500">Click anywhere to close · ESC</p>
+                  <p className="font-ui text-xs text-gray-500">Tap anywhere to close</p>
                 </motion.div>
               )}
             </AnimatePresence>

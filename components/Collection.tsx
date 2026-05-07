@@ -155,7 +155,7 @@ export default function Collection() {
             </h1>
           </div>
           {isConnected && (
-            <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-col items-start sm:items-end gap-1">
               <span className="font-ui text-sm text-gray-400">
                 <span className="text-[#00ff85] font-bold text-base">{totalOwned}</span>
                 <span className="text-gray-600"> / {ALL_CARDS.length} cards</span>

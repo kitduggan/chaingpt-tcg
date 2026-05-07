@@ -69,7 +69,7 @@ export default function Landing() {
                 >
                   {verb}
                 </motion.span>
-                <span className="font-ui text-sm text-gray-500 text-center leading-tight whitespace-pre-line">
+                <span className="font-ui text-xs sm:text-sm text-gray-500 text-center leading-tight whitespace-pre-line hidden sm:block">
                   {desc}
                 </span>
               </div>
@@ -94,14 +94,16 @@ export default function Landing() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
-          className="flex items-end justify-center gap-8"
+          className="flex items-end justify-center gap-4 sm:gap-8"
         >
           {[0, 1, 2].map((i) => {
             const hide = packOpen && clickedPack === i
+            // On mobile only show the centre pack
+            const mobileHide = i !== 1
             return (
               <motion.div
                 key={i}
-                className="relative cursor-pointer"
+                className={`relative cursor-pointer ${mobileHide ? 'hidden sm:block' : ''}`}
                 animate={{ y: [0, -10, 0] }}
                 transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut', delay: i * 0.4 }}
                 style={{ visibility: hide ? 'hidden' : 'visible', pointerEvents: hide ? 'none' : 'auto' }}
@@ -120,7 +122,7 @@ export default function Landing() {
                 <img
                   src="/pack.png"
                   alt="Card Pack"
-                  className="w-52 h-auto drop-shadow-[0_8px_24px_rgba(0,245,255,0.3)]"
+                  className="w-44 sm:w-52 h-auto drop-shadow-[0_8px_24px_rgba(0,245,255,0.3)]"
                   draggable={false}
                 />
               </motion.div>
@@ -137,7 +139,7 @@ export default function Landing() {
         >
           <button
             onClick={openPack}
-            className="group relative font-pixel text-sm px-10 py-4 cursor-pointer select-none"
+            className="group relative font-pixel text-xs sm:text-sm px-6 sm:px-10 py-3 sm:py-4 cursor-pointer select-none"
             style={{
               color: '#00f5ff',
               background: '#0a0a1a',
@@ -213,7 +215,7 @@ export default function Landing() {
           <div className="flex flex-col items-center gap-6 w-full">
             <h3 className="font-pixel text-[10px] text-gray-400 tracking-widest">CARD RARITIES</h3>
 
-            <div className="flex items-end justify-center gap-8 w-full">
+            <div className="flex items-end justify-center gap-3 sm:gap-8 w-full">
               {/* Common × 2 */}
               {[
                 { img: '/card-03-robotson-pool.png',   name: 'Mr. Robotson (Pool)', rarity: 'COMMON',   color: '#00f5ff', label: 'Most frequent. 15 unique cards.',   tilt: -6  },
